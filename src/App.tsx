@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { subscribeTenants, createTenant, updateTenant, deleteTenant, getTenantUserCount, createTenantOwner } from "./services/tenantService";
+import { subscribeTenants, createTenant, updateTenant, deleteTenant, getTenantUserCount, createTenantOwner, subscribeFeedback, markFeedbackRead, deleteFeedback, type Feedback } from "./services/tenantService";
 import type { Tenant } from "./types";
 
 const ADMIN_PASSWORD_HASH = "qguard2024admin";
@@ -161,6 +161,14 @@ export default function App() {
   const [userCounts, setUserCounts] = useState<Record<string,number>>({});
   const [ownerReset, setOwnerReset] = useState<Tenant|null>(null);
   const [ownerResetPass, setOwnerResetPass] = useState("");
+  const [view, setView] = useState<"companies"|"feedback">("companies");
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    const unsub = subscribeFeedback(items => setFeedback(items.sort((a,b) => b.createdAt.localeCompare(a.createdAt))));
+    return unsub;
+  }, [loggedIn]);
 
   const showToast = (msg: string, ok = true) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
 
@@ -240,6 +248,59 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-6xl p-6 space-y-6">
+        {/* View tabs */}
+        <div className="flex gap-2">
+          <button onClick={() => setView("companies")}
+            className={`px-5 py-2.5 rounded-2xl text-sm font-bold border transition ${view === "companies" ? "bg-amber-500 text-black border-amber-500" : "bg-white/5 text-slate-300 border-white/10"}`}>
+            🏢 الشركات
+          </button>
+          <button onClick={() => setView("feedback")}
+            className={`px-5 py-2.5 rounded-2xl text-sm font-bold border transition relative ${view === "feedback" ? "bg-amber-500 text-black border-amber-500" : "bg-white/5 text-slate-300 border-white/10"}`}>
+            📬 الملاحظات
+            {feedback.filter(f => !f.read).length > 0 && (
+              <span className="absolute -top-2 -left-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-black text-white">
+                {feedback.filter(f => !f.read).length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {view === "feedback" ? (
+          <div className="space-y-3">
+            {feedback.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/5 py-16">
+                <div className="text-5xl mb-3">📭</div>
+                <div className="font-black text-white">لا توجد ملاحظات بعد</div>
+              </div>
+            ) : feedback.map(f => (
+              <div key={f.id} className={`rounded-[20px] border p-5 ${f.read ? "border-white/10 bg-[#0b132b] opacity-70" : "border-amber-400/30 bg-amber-500/5"}`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <Badge color={f.type === "bug" ? "red" : f.type === "suggestion" ? "amber" : "slate"}>
+                        {f.type === "bug" ? "🐛 خطأ" : f.type === "suggestion" ? "💡 اقتراح" : "📝 أخرى"}
+                      </Badge>
+                      <span className="font-black text-white">{f.userName}</span>
+                      <span className="text-xs text-slate-500">({f.role})</span>
+                      {!f.read && <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">جديد</span>}
+                    </div>
+                    <div className="text-sm text-slate-300 whitespace-pre-wrap">{f.message}</div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 text-xs text-slate-500">
+                      <span>🏢 {f.tenantSlug}</span>
+                      <span>✉️ {f.userEmail}</span>
+                      <span>📅 {f.createdAt.slice(0, 16).replace("T", " ")}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    {!f.read && <Btn variant="success" className="text-xs h-8 px-3" onClick={() => markFeedbackRead(f.id)}>✓ مقروء</Btn>}
+                    <Btn variant="danger" className="text-xs h-8 px-3" onClick={() => deleteFeedback(f.id)}>🗑</Btn>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             {label:"الإجمالي",value:stats.total,color:"text-white"},
@@ -321,6 +382,8 @@ export default function App() {
               );
             })}
           </div>
+        )}
+        </>
         )}
       </main>
 

@@ -5,6 +5,26 @@ import {
 import { firestore } from "./firebase";
 import type { Tenant } from "../types";
 
+// ─── Platform Feedback ────────────────────────────────────────────────────────
+export interface Feedback {
+  id: string; tenantSlug: string; userName: string; userEmail: string;
+  role: string; message: string; type: string; createdAt: string; read: boolean;
+}
+
+export function subscribeFeedback(cb: (items: Feedback[]) => void): () => void {
+  return onSnapshot(collection(firestore, "platform_feedback"), snap => {
+    cb(snap.docs.map(d => ({ ...d.data(), id: d.id }) as Feedback));
+  }, () => cb([]));
+}
+
+export async function markFeedbackRead(id: string): Promise<void> {
+  try { await updateDoc(doc(firestore, "platform_feedback", id), { read: true }); } catch {}
+}
+
+export async function deleteFeedback(id: string): Promise<void> {
+  try { await deleteDoc(doc(firestore, "platform_feedback", id)); } catch {}
+}
+
 // Same hash as main QGuard app — so owner can log in there
 export function hashPassword(value: string): string {
   let hash = 5381;
