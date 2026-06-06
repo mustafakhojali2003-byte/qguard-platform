@@ -159,6 +159,8 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string|null>(null);
   const [userCounts, setUserCounts] = useState<Record<string,number>>({});
+  const [ownerReset, setOwnerReset] = useState<Tenant|null>(null);
+  const [ownerResetPass, setOwnerResetPass] = useState("");
 
   const showToast = (msg: string, ok = true) => { setToast({msg,ok}); setTimeout(()=>setToast(null),3000); };
 
@@ -311,6 +313,7 @@ export default function App() {
                         {t.active?"⛔ إيقاف":"✅ تفعيل"}
                       </Btn>
                       <Btn variant="secondary" className="text-xs h-8 px-3" onClick={()=>{setEditTenant(t);setModal("edit");}}>✏️</Btn>
+                      <Btn variant="secondary" className="text-xs h-8 px-3" onClick={()=>{setOwnerReset(t);setOwnerResetPass("");}}>🔑 المالك</Btn>
                       <Btn variant="danger" className="text-xs h-8 px-3" onClick={()=>setConfirmDelete(t.slug)}>🗑</Btn>
                     </div>
                   </div>
@@ -335,6 +338,44 @@ export default function App() {
               <Btn variant="danger" className="flex-1 h-11" onClick={()=>handleDelete(confirmDelete)}>🗑 حذف</Btn>
               <Btn variant="secondary" className="flex-1 h-11" onClick={()=>setConfirmDelete(null)}>إلغاء</Btn>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Owner reset modal */}
+      {ownerReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.85)"}}
+          onClick={e => { if (e.target === e.currentTarget) setOwnerReset(null); }}>
+          <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0b132b] p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-lg font-black text-white">🔑 حساب مالك {ownerReset.companyName}</div>
+              <button onClick={()=>setOwnerReset(null)} className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-400">✕</button>
+            </div>
+            <p className="text-sm text-slate-400">
+              {ownerReset.ownerEmail
+                ? `سيتم إنشاء/إعادة تعيين حساب المالك بالبريد: ${ownerReset.ownerEmail}`
+                : "⚠️ لا يوجد بريد مالك. عدّل الشركة وأضف بريد المالك أولاً."}
+            </p>
+            {ownerReset.ownerEmail && (
+              <>
+                <Input label="كلمة المرور المؤقتة" type="text" placeholder="6 أحرف على الأقل — يغيّرها المالك لاحقاً"
+                  value={ownerResetPass} onChange={(e:any)=>setOwnerResetPass(e.target.value)} />
+                <Btn className="w-full h-11" onClick={async()=>{
+                  if (ownerResetPass.length < 6) { showToast("❌ كلمة المرور 6 أحرف على الأقل", false); return; }
+                  try {
+                    await createTenantOwner(ownerReset.slug, ownerReset.ownerName || "المالك", ownerReset.ownerEmail!, ownerResetPass);
+                    showToast("✅ تم إنشاء حساب المالك");
+                    setOwnerReset(null);
+                  } catch { showToast("❌ حدث خطأ", false); }
+                }}>✅ إنشاء / إعادة تعيين</Btn>
+                <div className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-3 text-xs text-amber-300">
+                  بعد الإنشاء، أعطِ المالك:<br/>
+                  الرابط: {QGUARD_APP_URL}/{ownerReset.slug}<br/>
+                  البريد: {ownerReset.ownerEmail}<br/>
+                  كلمة المرور: {ownerResetPass || "..."}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
