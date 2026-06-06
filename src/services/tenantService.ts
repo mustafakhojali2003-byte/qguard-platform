@@ -5,6 +5,28 @@ import {
 import { firestore } from "./firebase";
 import type { Tenant } from "../types";
 
+// Same hash as main QGuard app — so owner can log in there
+export function hashPassword(value: string): string {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) hash = (hash * 33) ^ value.charCodeAt(i);
+  return `h${(hash >>> 0).toString(16)}`;
+}
+
+// Create the owner account inside the tenant's data
+export async function createTenantOwner(slug: string, name: string, email: string, password: string): Promise<void> {
+  const ownerId = `owner-${slug}-${Date.now().toString(36)}`;
+  const allPerms = [
+    "reports","alerts","attendance","buildings","viewReports","chat","visitors",
+    "shifts","violations","scores","tasks","analytics","audit","patrol","sos","users","map",
+  ];
+  await setDoc(doc(firestore, "tenants", slug, "approved_users", ownerId), {
+    name, email, phone: "", role: "owner", status: "approved",
+    permissions: allPerms, rating: 5, passwordHash: hashPassword(password),
+    soundEnabled: true, desktopNotificationsEnabled: true, showFullToAdmin: true,
+    createdAt: new Date().toISOString().slice(0, 16).replace("T", " "), violations: 0,
+  });
+}
+
 // Tenants collection — root level (not under any tenant)
 const tenantsCol = () => collection(firestore, "tenants");
 

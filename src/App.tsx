@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { subscribeTenants, createTenant, updateTenant, deleteTenant, getTenantUserCount } from "./services/tenantService";
+import { subscribeTenants, createTenant, updateTenant, deleteTenant, getTenantUserCount, createTenantOwner } from "./services/tenantService";
 import type { Tenant } from "./types";
 
 const ADMIN_PASSWORD_HASH = "qguard2024admin";
@@ -75,13 +75,14 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   );
 }
 
-function TenantModal({ tenant, onSave, onClose }: { tenant?: Tenant | null; onSave: (t: Tenant) => void; onClose: () => void }) {
+function TenantModal({ tenant, onSave, onClose }: { tenant?: Tenant | null; onSave: (t: Tenant, ownerPassword: string) => void; onClose: () => void }) {
   const isEdit = !!tenant;
   const [form, setForm] = useState<Tenant>(tenant ?? {
     slug: "", companyName: "", companyNameEn: "", logo: "", maxUsers: 20, active: true,
     subscriptionEnd: new Date(Date.now() + 365*86400000).toISOString().slice(0,10),
     createdAt: new Date().toISOString(), ownerEmail: "", ownerName: "", notes: "",
   });
+  const [ownerPassword, setOwnerPassword] = useState("");
   const [err, setErr] = useState("");
   const s = (k: keyof Tenant) => (e: any) => setForm(p => ({ ...p, [k]: e.target.value }));
 
@@ -91,7 +92,11 @@ function TenantModal({ tenant, onSave, onClose }: { tenant?: Tenant | null; onSa
     if (!form.companyName.trim()) return setErr("اسم الشركة العربي مطلوب");
     if (!form.companyNameEn.trim()) return setErr("اسم الشركة الإنجليزي مطلوب");
     if (form.maxUsers < 1) return setErr("عدد المستخدمين يجب أن يكون 1 على الأقل");
-    setErr(""); onSave(form);
+    if (!isEdit) {
+      if (!form.ownerEmail?.trim()) return setErr("بريد المالك مطلوب لإنشاء حسابه");
+      if (!ownerPassword.trim() || ownerPassword.length < 6) return setErr("كلمة مرور المالك (6 أحرف على الأقل)");
+    }
+    setErr(""); onSave(form, ownerPassword);
   };
 
   return (
@@ -118,6 +123,10 @@ function TenantModal({ tenant, onSave, onClose }: { tenant?: Tenant | null; onSa
             onChange={(e: any) => setForm(p => ({ ...p, maxUsers: parseInt(e.target.value)||1 }))} />
           <Input label="انتهاء الاشتراك" type="date" value={form.subscriptionEnd} onChange={s("subscriptionEnd")} />
         </div>
+        {!isEdit && (
+          <Input label="🔑 كلمة مرور المالك (لأول تسجيل دخول)" type="text" placeholder="6 أحرف على الأقل"
+            value={ownerPassword} onChange={(e: any) => setOwnerPassword(e.target.value)} />
+        )}
         <Input label="رابط الشعار (اختياري)" placeholder="https://..." value={form.logo ?? ""} onChange={s("logo")} />
         <div>
           <label className="mb-1 block text-xs font-semibold text-slate-400">ملاحظات</label>
@@ -163,10 +172,19 @@ export default function App() {
     return unsub;
   }, [loggedIn]);
 
-  const handleSave = async (t: Tenant) => {
+  const handleSave = async (t: Tenant, ownerPassword: string) => {
     try {
-      modal === "edit" ? await updateTenant(t.slug, t) : await createTenant(t);
-      showToast(modal === "edit" ? "✅ تم التحديث" : "✅ تم إنشاء الشركة");
+      if (modal === "edit") {
+        await updateTenant(t.slug, t);
+        showToast("✅ تم التحديث");
+      } else {
+        await createTenant(t);
+        // Create owner account inside the tenant
+        if (t.ownerEmail && ownerPassword) {
+          await createTenantOwner(t.slug, t.ownerName || "المالك", t.ownerEmail, ownerPassword);
+        }
+        showToast("✅ تم إنشاء الشركة وحساب المالك");
+      }
       setModal(null); setEditTenant(null);
     } catch { showToast("❌ حدث خطأ", false); }
   };
