@@ -2,14 +2,7 @@ import { useState, useEffect } from "react";
 import { subscribeTenants, createTenant, updateTenant, deleteTenant, getTenantUserCount, createTenantOwner, subscribeFeedback, markFeedbackRead, deleteFeedback, type Feedback } from "./services/tenantService";
 import type { Tenant } from "./types";
 
-const ADMIN_PASSWORD_HASH = "qguard2024admin";
 const QGUARD_APP_URL = "https://mustafaqa.vercel.app";
-
-function simpleHash(s: string) {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
-  return (h >>> 0).toString(36);
-}
 
 const Btn = ({ children, onClick, variant = "primary", className = "", disabled = false, type = "button" }: any) => (
   <button type={type} disabled={disabled} onClick={onClick}
@@ -47,8 +40,7 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   const [pass, setPass] = useState("");
   const [err, setErr] = useState("");
   const check = () => {
-    if (simpleHash(pass) === simpleHash(ADMIN_PASSWORD_HASH)) { onLogin(); }
-    else if (pass === "QGuard@Admin2024") { onLogin(); }
+    if (pass === "mus2003kh") { onLogin(); }
     else setErr("كلمة المرور غير صحيحة");
   };
   return (
